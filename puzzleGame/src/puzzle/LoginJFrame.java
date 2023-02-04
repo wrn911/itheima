@@ -1,24 +1,20 @@
 package puzzle;
 
-import User.User;
+import domain.User;
 import Util.CodeUtil;
+import cn.hutool.core.io.FileUtil;
 
 import javax.swing.*;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.util.ArrayList;
+import java.util.List;
 
 public class LoginJFrame extends JFrame implements MouseListener {
     //登录界面
 
     //定义一个列表,储存用户信息
-    static ArrayList<User> list = new ArrayList<>();
-
-    //在这里写一个静态代码块,初始化用户信息
-    static {
-        list.add(new User("zhangsan", "123456"));
-        list.add(new User("lisi", "123456"));
-    }
+    ArrayList<User> list = new ArrayList<>();
 
     //添加登录按钮
     JButton login = new JButton();
@@ -41,6 +37,10 @@ public class LoginJFrame extends JFrame implements MouseListener {
     String registerPath = "puzzleGame\\image\\register\\注册按钮.png";
 
     public LoginJFrame() {
+        //获取用户信息
+        //写在构造方法中,每次打开登陆界面时都会执行,防止文件中的数据发生了变化
+        getInfos();
+
         //初始化菜单
         initJFrame();
 
@@ -50,12 +50,23 @@ public class LoginJFrame extends JFrame implements MouseListener {
         //设为可见,建议写在最后
         this.setVisible(true);
 
-
         //添加监听
         login.addMouseListener(this);
         register.addMouseListener(this);
 
         rightCode.addMouseListener(this);
+    }
+
+    //从文件中获取用户信息
+    private void getInfos() {
+        List<String> userInfoList = FileUtil.readUtf8Lines("D:\\Java\\IdeaProjects\\itheima\\puzzleGame\\src\\name.txt");
+        for (String line : userInfoList) {
+            String[] arr = line.split("&");
+            String[] arr1 = arr[0].split("=");
+            String[] arr2 = arr[1].split("=");
+
+            list.add(new User(arr1[1], arr2[1]));
+        }
     }
 
     //初始化图片
@@ -152,8 +163,22 @@ public class LoginJFrame extends JFrame implements MouseListener {
             String inPassword;
             String inCode;
 
-            //获取用户名,密码,验证码
+            //获取用户名
             inUsername = username.getText();
+            //判断用户名是否为空
+            if (inUsername.length() == 0) {
+                showJDialog("请输入用户名");
+                return;
+            }
+            //获取用户
+            User user = findUser(inUsername);
+            //判断用户名是否被锁定
+            if (user.getCount() == 3) {
+                showJDialog("当前用户已经被锁定");
+                return;
+            }
+
+            //获取密码,验证码
             inPassword = password.getText();
             inCode = code.getText();
 
@@ -167,21 +192,21 @@ public class LoginJFrame extends JFrame implements MouseListener {
                     return;
                 }
 
-                //创建对象
-                User user = new User(inUsername, inPassword);
-                //判断对象在列表中存在与否
-                boolean flag = containsInList(list, user);
-                if (flag) {
+                if (inUsername.equals(user.getUserName()) && inPassword.equals(user.getPassword())) {
                     new GameJFrame();
                     //关掉当前窗口
                     this.setVisible(false);
+                    //设置连续输错次数为零
+                    user.setCount(0);
                 } else {
-                    showJDialog("用户名或密码不正确,请重新输入");
+                    int count = user.getCount();
+                    count++;
+                    showJDialog("用户名或密码不正确,您还剩" + (3 - count) + "次机会");
+                    user.setCount(count);
                 }
-            }else {
-                if (inUsername.equals("")) {
-                    showJDialog("请输入用户名");
-                } else if (inPassword.equals("")) {
+                FileUtil.writeUtf8Lines(list, "D:\\Java\\IdeaProjects\\itheima\\puzzleGame\\src\\name.txt");
+            } else {
+                if (inPassword.equals("")) {
                     showJDialog("请输入密码");
                 } else if (inCode.equals("")) {
                     showJDialog("请输入验证码");
@@ -189,7 +214,7 @@ public class LoginJFrame extends JFrame implements MouseListener {
             }
         } else if (source == register) {
             //登录
-            new RegisterJFrame();
+            new RegisterJFrame(list);
             //关掉当前窗口
             this.setVisible(false);
         } else if (source == rightCode) {
@@ -201,6 +226,16 @@ public class LoginJFrame extends JFrame implements MouseListener {
         }
 
 
+    }
+
+    //根据用户名找到对应的用户对象
+    public User findUser(String username) {
+        for (User user : list) {
+            if (user.getUserName().equals(username)) {
+                return user;
+            }
+        }
+        return null;
     }
 
     //判断对象在列表中存在与否
